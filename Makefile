@@ -5,6 +5,8 @@ CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=.deps/usr
 BUILD_TYPE ?= $(shell (type ninja > /dev/null 2>&1 && echo "Ninja") || \
     echo "Unix Makefiles")
 
+MSGPACK_GEN = scripts/msgpack-gen.lua
+
 ifeq (,$(BUILD_TOOL))
   ifeq (Ninja,$(BUILD_TYPE))
       ifneq ($(shell cmake --help 2>/dev/null | grep Ninja),)
@@ -50,6 +52,14 @@ deps: | .deps/build/third-party/.ran-cmake
 		cmake -G '$(BUILD_TYPE)' $(DEPS_CMAKE_FLAGS) ../../../third-party
 	touch $@
 
+src/msgpack_rpc/neovim.msgspec: src/api.h $(MSGPACK_GEN)
+	lua $(MSGPACK_GEN) --idl $< > $@
+
+src/msgpack_rpc/server_impl.c: src/msgpack_rpc/neovim.msgspec $(MSGPACK_GEN)
+	lua $(MSGPACK_GEN) --c-server $< > $@
+
+msgpack_rpc: src/msgpack_rpc/server_impl.c
+
 test: | nvim
 	+$(SINGLE_MAKE) -C src/testdir
 
@@ -66,4 +76,4 @@ distclean: clean
 install: | nvim
 	+$(BUILD_TOOL) -C build install
 
-.PHONY: test unittest clean distclean nvim cmake deps install
+.PHONY: msgpack test unittest clean distclean nvim cmake deps install
